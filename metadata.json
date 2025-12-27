@@ -1,0 +1,7 @@
+{
+  "name": "anything to anyone Transfer",
+  "description": "A professional, secure, and fast file-sharing application designed for seamless transfer between Mac and Android devices using unique room codes and AI-powered file insights.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
