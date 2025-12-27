@@ -1,5 +1,5 @@
 {
-  "name": "anything-to-anyone-transfer",
+  "name": "orbit-transfer",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,8 +12,8 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "@google/genai": "^1.34.0",
-    "jsqr": "1.4.0",
-    "qrcode": "1.5.3"
+    "qrcode": "1.5.3",
+    "jsqr": "^1.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

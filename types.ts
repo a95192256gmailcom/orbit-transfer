@@ -3,7 +3,8 @@ export enum TransferStatus {
   UPLOADING = 'UPLOADING',
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
-  PENDING = 'PENDING'
+  PENDING = 'PENDING',
+  CONNECTING = 'CONNECTING'
 }
 
 export interface SharedFile {
@@ -17,10 +18,29 @@ export interface SharedFile {
   progress: number;
   sender: 'Mac' | 'Android';
   aiInsight?: string;
+  errorMessage?: string;
+  isP2P?: boolean;
+}
+
+export interface HistoryItem {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  timestamp: number;
+  sender: 'Mac' | 'Android';
+  aiInsight?: string;
 }
 
 export interface RoomState {
   roomId: string;
   participants: string[];
   files: SharedFile[];
+}
+
+export interface FileChunk {
+  fileId: string;
+  chunkIndex: number;
+  totalChunks: number;
+  data: ArrayBuffer;
 }

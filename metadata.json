@@ -1,7 +1,5 @@
 {
-  "name": "anything to anyone Transfer",
-  "description": "A professional, secure, and fast file-sharing application designed for seamless transfer between Mac and Android devices using unique room codes and AI-powered file insights.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "Orbit Transfer",
+  "description": "Enterprise-grade secure file sharing. Optimized for ultra-large files (up to 500GB) between Mac and Android using high-speed peer-to-peer simulation and AI insights.",
+  "requestFramePermissions": []
 }
