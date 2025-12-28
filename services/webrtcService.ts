@@ -40,7 +40,8 @@ export class WebRTCService {
 
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        this.signalChannel.postMessage({ type: 'ICE_CANDIDATE', data: event.candidate });
+        // Convert to JSON to avoid DataCloneError
+        this.signalChannel.postMessage({ type: 'ICE_CANDIDATE', data: event.candidate.toJSON() });
       }
     };
 
@@ -72,6 +73,7 @@ export class WebRTCService {
 
     const offer = await this.peerConnection.createOffer();
     await this.peerConnection.setLocalDescription(offer);
+    // RTCSessionDescriptionInit is already serializable; removed .toJSON() which is not defined on the type
     this.signalChannel.postMessage({ type: 'OFFER', data: offer });
   }
 
@@ -82,6 +84,7 @@ export class WebRTCService {
     await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
+    // RTCSessionDescriptionInit is already serializable; removed .toJSON() which is not defined on the type
     this.signalChannel.postMessage({ type: 'ANSWER', data: answer });
   }
 
@@ -92,7 +95,11 @@ export class WebRTCService {
 
   private async handleIceCandidate(candidate: RTCIceCandidateInit) {
     if (!this.peerConnection) return;
-    await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    try {
+      await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (e) {
+      console.error('Error adding ICE candidate', e);
+    }
   }
 
   setOnMessage(callback: (data: any) => void) {

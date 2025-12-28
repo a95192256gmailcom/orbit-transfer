@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SharedFile, TransferStatus, HistoryItem } from './types';
-import { LaptopIcon, SmartphoneIcon, UploadIcon, FileIcon, CheckIcon, CopyIcon, TrashIcon, HashIcon, HistoryIcon } from './components/Icons';
+import { LaptopIcon, SmartphoneIcon, UploadIcon, FileIcon, CheckIcon, CopyIcon, TrashIcon, HashIcon, HistoryIcon, TransferArrowIcon, OrbitLogo } from './components/Icons';
 import { getFileInsight } from './services/geminiService';
 import { WebRTCService } from './services/webrtcService';
 import QRCodeDisplay from './components/QRCodeDisplay';
-import QRScanner from './components/QRScanner';
 
 const App: React.FC = () => {
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -16,7 +15,6 @@ const App: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deviceType, setDeviceType] = useState<'Mac' | 'Android'>('Mac');
   const [p2pConnected, setP2pConnected] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
   
   const webrtcRef = useRef<WebRTCService | null>(null);
   const incomingFileRef = useRef<{ 
@@ -181,98 +179,136 @@ const App: React.FC = () => {
     }
   };
 
-  const handleScan = (code: string) => {
-    if (code.length === 6) {
-      setRoomId(code.toUpperCase());
-      setIsScanning(false);
-    }
+  const downloadApk = () => {
+    const link = document.createElement('a');
+    link.href = '/orbit-transfer-v1.apk';
+    link.download = 'OrbitTransfer.apk';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const renderDirectionIndicator = (sender: 'Mac' | 'Android') => {
+    const isMe = sender === deviceType;
+    const peerType = deviceType === 'Mac' ? 'Android' : 'Mac';
+
+    return (
+      <div className="flex items-center gap-2 mb-2 p-2 bg-slate-50 rounded-xl border border-slate-100 w-fit">
+        <div className="flex items-center gap-1.5">
+          {sender === 'Mac' ? <LaptopIcon className="w-4 h-4 text-slate-500" /> : <SmartphoneIcon className="w-4 h-4 text-slate-500" />}
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${isMe ? 'text-blue-600' : 'text-slate-500'}`}>
+            {isMe ? 'You' : peerType}
+          </span>
+        </div>
+        <TransferArrowIcon className="text-slate-300" />
+        <div className="flex items-center gap-1.5">
+          {sender === 'Mac' ? <SmartphoneIcon className="w-4 h-4 text-slate-500" /> : <LaptopIcon className="w-4 h-4 text-slate-500" />}
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${!isMe ? 'text-blue-600' : 'text-slate-500'}`}>
+            {!isMe ? 'You' : peerType}
+          </span>
+        </div>
+      </div>
+    );
   };
 
   if (!roomId) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="max-w-md w-full space-y-8 glass p-10 rounded-3xl shadow-2xl border border-white">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#0d0e17] overflow-hidden relative">
+        {/* Aesthetic Background Glows */}
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-purple-600/10 blur-[150px] rounded-full"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-pink-600/10 blur-[150px] rounded-full"></div>
+
+        <div className="max-w-md w-full space-y-8 bg-white/5 backdrop-blur-3xl p-10 rounded-[3rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] border border-white/10 z-10">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center p-4 bg-blue-600 text-white rounded-2xl shadow-lg mb-6">
-              <UploadIcon />
+            <div className="flex justify-center mb-4 transform scale-100 drop-shadow-[0_0_30px_rgba(155,81,224,0.35)]">
+              <OrbitLogo size="md" lightText={true} />
             </div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Orbit Transfer</h1>
-            <p className="mt-3 text-slate-500 font-medium">True <span className="text-blue-600 font-bold underline decoration-wavy">P2P Sharing</span>. Direct transfer up to 500GB without servers.</p>
+            <p className="mt-2 text-slate-400 font-medium leading-relaxed max-w-[280px] mx-auto">Zero servers, absolute privacy. Secure peer-to-peer file sharing up to 500GB.</p>
           </div>
 
           <div className="space-y-4">
-            <button onClick={createRoom} className="w-full py-4 border border-transparent text-lg font-semibold rounded-2xl text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md transform hover:-translate-y-0.5">
-              Launch P2P Hub
+            <button onClick={createRoom} className="w-full py-5 border border-transparent text-lg font-bold rounded-2xl text-white bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 hover:brightness-110 transition-all shadow-2xl shadow-purple-900/30 transform hover:-translate-y-1 active:scale-95 active:translate-y-0">
+              Launch Direct Hub
             </button>
-            <div className="relative py-2">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-              <div className="relative flex justify-center text-sm"><span className="px-3 bg-white text-slate-500 font-semibold rounded-full border border-slate-100 uppercase tracking-widest text-[10px]">or pair device</span></div>
+            
+            <div className="relative py-5">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+              <div className="relative flex justify-center text-sm"><span className="px-4 bg-[#0d0e17] text-slate-500 font-bold uppercase tracking-widest text-[11px]">Secure Connection</span></div>
             </div>
-            <form onSubmit={joinRoom} className="space-y-3">
+
+            <form onSubmit={joinRoom} className="space-y-4">
               <input
                 type="text" maxLength={6} value={joinInput} onChange={(e) => setJoinInput(e.target.value.toUpperCase())}
-                placeholder="Enter 6-digit code"
-                className="block w-full px-5 py-4 text-center tracking-[0.5em] font-mono text-xl border border-slate-200 rounded-2xl focus:ring-blue-500 focus:border-blue-500 outline-none"
+                placeholder="6-DIGIT CODE"
+                className="block w-full px-5 py-5 text-center tracking-[0.6em] font-mono text-3xl bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-slate-800 focus:ring-2 focus:ring-purple-500/40 outline-none transition-all"
               />
-              <div className="flex gap-2">
-                <button type="submit" className="flex-1 py-4 bg-slate-900 text-white font-semibold rounded-2xl hover:bg-black transition-all">
-                  Connect to Room
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setIsScanning(true)}
-                  className="p-4 bg-white border border-slate-200 text-slate-700 rounded-2xl hover:bg-slate-50 transition-all shadow-sm"
-                  title="Scan QR Code"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><rect x="7" y="7" width="3" height="3"/><rect x="14" y="7" width="3" height="3"/><rect x="7" y="14" width="3" height="3"/><path d="M14 14h3v3h-3z"/></svg>
-                </button>
-              </div>
+              <button type="submit" className="w-full py-5 bg-white text-[#0d0e17] font-bold text-lg rounded-2xl hover:bg-slate-100 transition-all active:scale-95 active:bg-slate-200">
+                Join Transfer Hub
+              </button>
             </form>
           </div>
 
-          <div className="flex justify-center items-center gap-6 mt-8 pt-8 border-t border-slate-100 opacity-40">
-             <div className="flex flex-col items-center"><LaptopIcon /><span className="text-[10px] mt-1 font-bold">Mac</span></div>
-             <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full"><span className="text-[8px] font-black uppercase tracking-tighter">WebRTC Enabled</span></div>
-             <div className="flex flex-col items-center"><SmartphoneIcon /><span className="text-[10px] mt-1 font-bold">Android</span></div>
+          <div className="pt-8 border-t border-white/10">
+            <button 
+              onClick={downloadApk}
+              className="w-full flex items-center justify-center gap-4 px-6 py-5 bg-white/5 text-white rounded-[2rem] border border-white/10 hover:bg-white/10 transition-all group overflow-hidden relative"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <SmartphoneIcon className="text-pink-400 relative z-10" />
+              <div className="text-left relative z-10">
+                <p className="text-sm font-bold leading-none">Android Companion</p>
+                <p className="text-[10px] font-medium opacity-40 mt-1">Direct APK installation</p>
+              </div>
+              <div className="ml-auto opacity-30 group-hover:opacity-100 transition-all group-hover:translate-x-1 relative z-10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+              </div>
+            </button>
+          </div>
+
+          <div className="flex justify-center items-center gap-10 mt-6 opacity-20 grayscale transition-all duration-700 hover:grayscale-0 hover:opacity-100">
+             <div className="flex flex-col items-center gap-2">
+               <LaptopIcon className="text-white w-5 h-5" />
+               <span className="text-[10px] font-black text-white uppercase tracking-wider">macOS</span>
+             </div>
+             <div className="h-6 w-px bg-white/20"></div>
+             <div className="flex flex-col items-center gap-2">
+               <SmartphoneIcon className="text-white w-5 h-5" />
+               <span className="text-[10px] font-black text-white uppercase tracking-wider">Android</span>
+             </div>
           </div>
         </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-slate-400 text-xs font-medium">
-            Having trouble? If the app doesn't work, contact us at:
-          </p>
+        <div className="mt-16 text-center z-10">
+          <p className="text-slate-600 text-[10px] font-bold uppercase tracking-[0.25em] mb-3">Enterprise Infrastructure</p>
           <a 
             href="mailto:ayushglobalenterprises@zohomail.in" 
-            className="text-blue-500 hover:text-blue-600 text-sm font-bold mt-1 inline-block transition-colors underline decoration-blue-500/30"
+            className="text-purple-400/60 hover:text-white text-xs font-bold transition-all border-b border-transparent hover:border-purple-500/40 pb-1"
           >
             ayushglobalenterprises@zohomail.in
           </a>
         </div>
-
-        {isScanning && <QRScanner onScan={handleScan} onClose={() => setIsScanning(false)} />}
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
-      <nav className="glass sticky top-0 z-20 px-4 py-4 border-b border-slate-200 shadow-sm">
+      <nav className="glass sticky top-0 z-20 px-4 py-1.5 border-b border-slate-200 shadow-sm">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 text-white rounded-lg shadow-md"><UploadIcon /></div>
-            <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700">Orbit P2P</span>
+          <div className="flex items-center -ml-2">
+            <OrbitLogo size="sm" lightText={false} className="scale-[0.85] origin-left" />
           </div>
           
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:border-blue-300 transition-all group">
-              <div className="bg-slate-50 px-3 py-2 border-r border-slate-200 flex items-center gap-1.5 group-hover:bg-blue-50"><HashIcon /></div>
+            <div className="flex items-center bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:border-purple-300 transition-all group">
+              <div className="bg-slate-50 px-3 py-2 border-r border-slate-200 flex items-center gap-1.5 group-hover:bg-purple-50"><HashIcon className="text-purple-500" /></div>
               <div className="px-4 py-2 flex items-center gap-3">
                 <span className="text-sm font-mono font-bold text-slate-800 tracking-widest uppercase">{roomId}</span>
-                <button onClick={copyRoomId} className="text-slate-300 hover:text-blue-600 transition-colors p-1"><CopyIcon /></button>
+                <button onClick={copyRoomId} className="text-slate-300 hover:text-purple-600 transition-colors p-1"><CopyIcon /></button>
               </div>
             </div>
-            <button onClick={() => setRoomId(null)} className="text-xs font-black text-red-500 hover:text-red-700 bg-red-50 px-3 py-2 rounded-xl transition-all uppercase tracking-widest">
-              Exit
+            <button onClick={() => setRoomId(null)} className="text-[10px] font-black text-red-500 hover:text-white hover:bg-red-500 bg-red-50 px-4 py-2.5 rounded-xl transition-all uppercase tracking-widest border border-red-100">
+              Disconnect
             </button>
           </div>
         </div>
@@ -281,132 +317,179 @@ const App: React.FC = () => {
       <main className="max-w-5xl mx-auto px-4 mt-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><UploadIcon />P2P Uploader</h2>
-              <div className="relative group">
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm group">
+              <h2 className="text-base font-bold mb-5 flex items-center gap-3 text-slate-800">
+                <div className="p-2 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-110 transition-transform"><UploadIcon /></div>
+                File Hub
+              </h2>
+              <div className="relative group/upload">
                 <input type="file" multiple onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                <div className="border-2 border-dashed border-slate-200 rounded-2xl p-10 flex flex-col items-center justify-center text-center group-hover:border-blue-400 group-hover:bg-blue-50 transition-all">
-                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><UploadIcon /></div>
-                  <p className="text-sm font-semibold text-slate-700">Send up to 500GB</p>
-                  <p className="text-xs text-slate-400 mt-1">Direct peer connection</p>
+                <div className="border-2 border-dashed border-slate-100 rounded-[2rem] p-12 flex flex-col items-center justify-center text-center group-hover/upload:border-purple-400 group-hover/upload:bg-purple-50/50 transition-all duration-300">
+                  <div className="w-14 h-14 bg-slate-50 rounded-full flex items-center justify-center mb-5 group-hover/upload:scale-110 group-hover/upload:bg-white group-hover/upload:shadow-sm transition-all"><UploadIcon className="text-slate-400" /></div>
+                  <p className="text-sm font-bold text-slate-800">Direct P2P Tunnel</p>
+                  <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-wider">Drag files here</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-              <h3 className="text-sm font-bold text-slate-900 mb-4 uppercase tracking-wider">Pair with {deviceType === 'Mac' ? 'Android' : 'Mac'}</h3>
-              <QRCodeDisplay text={roomId} size={140} />
-              <div className="flex items-center gap-2 mt-4">
-                <div className={`w-2 h-2 rounded-full ${p2pConnected ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`}></div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                  {p2pConnected ? 'Encrypted Channel Ready' : 'Awaiting Peer Connection'}
+            <div className="bg-white p-7 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center overflow-hidden">
+              <h3 className="text-[11px] font-black text-slate-400 mb-5 uppercase tracking-[0.25em]">Sync Access</h3>
+              <div className="p-1 bg-slate-50 rounded-[1.8rem] border border-slate-100">
+                <QRCodeDisplay text={roomId} size={150} />
+              </div>
+              <div className="flex items-center gap-2.5 mt-6 px-4 py-2 bg-slate-50 rounded-full border border-slate-100">
+                <div className={`w-2.5 h-2.5 rounded-full ${p2pConnected ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-amber-500 animate-pulse'}`}></div>
+                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">
+                  {p2pConnected ? 'Encrypted Stream Active' : 'Waiting for Peer...'}
                 </p>
               </div>
+              
+              <button 
+                onClick={downloadApk}
+                className="w-full mt-8 py-4 px-4 bg-slate-900 text-white rounded-2xl text-[11px] font-black hover:bg-black transition-all flex items-center justify-center gap-3 uppercase tracking-widest"
+              >
+                <SmartphoneIcon className="w-4 h-4" />
+                Get Android APK
+              </button>
             </div>
           </div>
 
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex gap-1 flex-1">
-                <button onClick={() => setActiveTab('room')} className={`flex-1 py-2 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'room' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><HashIcon />Live Tunnel</button>
-                <button onClick={() => setActiveTab('history')} className={`flex-1 py-2 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'history' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}><HistoryIcon />Transfer Log</button>
+          <div className="lg:col-span-2 space-y-5">
+            <div className="flex items-center justify-between bg-white p-2 rounded-[1.8rem] border border-slate-200 shadow-sm">
+              <div className="flex gap-1.5 flex-1">
+                <button onClick={() => setActiveTab('room')} className={`flex-1 py-3 px-6 rounded-2xl text-[11px] font-black transition-all flex items-center justify-center gap-2.5 uppercase tracking-widest ${activeTab === 'room' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}><HashIcon className="w-4 h-4" />Active Channel</button>
+                <button onClick={() => setActiveTab('history')} className={`flex-1 py-3 px-6 rounded-2xl text-[11px] font-black transition-all flex items-center justify-center gap-2.5 uppercase tracking-widest ${activeTab === 'history' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}><HistoryIcon className="w-4 h-4" />Transfer Log</button>
               </div>
             </div>
 
-            {activeTab === 'room' ? (
-              <div className="space-y-4">
-                {files.length === 0 ? (
-                  <div className="bg-white rounded-3xl border border-slate-100 p-20 flex flex-col items-center justify-center text-center">
-                    <FileIcon />
-                    <p className="text-slate-400 font-medium mt-4">No active streams.</p>
-                    <p className="text-xs text-slate-300 mt-1">Files sent via WebRTC skip the server entirely.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {files.map((file) => (
-                      <div key={file.id} className={`bg-white p-5 rounded-3xl border ${file.status === TransferStatus.FAILED ? 'border-red-200 bg-red-50/30' : 'border-slate-200'} shadow-sm relative group`}>
-                        <div className="flex items-start gap-4">
-                          <div className={`p-3 rounded-2xl ${file.sender === 'Mac' ? 'bg-indigo-50 text-indigo-600' : 'bg-green-50 text-green-600'}`}>
-                            {file.sender === 'Mac' ? <LaptopIcon /> : <SmartphoneIcon />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center gap-2 truncate">
-                                <h3 className="text-sm font-bold text-slate-900 truncate">{file.name}</h3>
-                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black uppercase rounded">Direct P2P</span>
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-400">{formatSize(file.size)}</span>
+            <div className="min-h-[400px]">
+              {activeTab === 'room' ? (
+                <div className="space-y-4">
+                  {files.length === 0 ? (
+                    <div className="bg-white rounded-[2.5rem] border border-slate-100 p-24 flex flex-col items-center justify-center text-center opacity-60">
+                      <div className="p-5 bg-slate-50 rounded-3xl mb-6"><FileIcon className="text-slate-300 w-8 h-8" /></div>
+                      <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">Waiting for data...</p>
+                      <p className="text-[10px] text-slate-300 mt-2 font-medium max-w-[200px]">Files sent here bypass our servers and flow directly between devices.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 animate-in fade-in duration-500">
+                      {files.map((file) => (
+                        <div key={file.id} className={`bg-white p-7 rounded-[2.5rem] border ${file.status === TransferStatus.FAILED ? 'border-red-200 bg-red-50/20' : 'border-slate-200'} shadow-sm relative group transition-all hover:shadow-md`}>
+                          <div className="flex items-start gap-5">
+                            <div className={`p-4 rounded-[1.5rem] shadow-sm ${file.sender === deviceType ? 'bg-purple-50 text-purple-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                              {file.sender === 'Mac' ? <LaptopIcon className="w-6 h-6" /> : <SmartphoneIcon className="w-6 h-6" />}
                             </div>
-                            
-                            {file.status === TransferStatus.UPLOADING ? (
-                              <div className="mt-2">
-                                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${file.progress}%` }}></div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3 truncate">
+                                  <h3 className="text-sm font-black text-slate-900 truncate tracking-tight">{file.name}</h3>
+                                  <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-black uppercase rounded-md tracking-widest">Direct P2P</span>
                                 </div>
-                                <p className="text-[10px] font-bold text-blue-600 mt-1 uppercase tracking-wider">Bitstream: {file.progress}%</p>
+                                <span className="text-[10px] font-black text-slate-400 tabular-nums">{formatSize(file.size)}</span>
                               </div>
-                            ) : file.status === TransferStatus.FAILED ? (
-                              <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-medium">{file.errorMessage || "Transfer lost."}</div>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <CheckIcon /><span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Received & Verified</span>
-                                </div>
-                                {file.aiInsight && (
-                                  <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-2">
-                                    <span className="text-blue-500 font-bold text-[10px] uppercase mt-0.5">AI</span>
-                                    <p className="text-xs text-slate-600 italic">{file.aiInsight}</p>
+                              
+                              {renderDirectionIndicator(file.sender)}
+
+                              {file.status === TransferStatus.UPLOADING ? (
+                                <div className="mt-4">
+                                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-gradient-to-r from-purple-600 to-pink-500 transition-all duration-300 ease-out" style={{ width: `${file.progress}%` }}></div>
                                   </div>
-                                )}
-                                <div className="mt-4 flex gap-2">
-                                  <a href={file.url} download={file.name} className="flex-1 py-2 text-center bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-colors">Download from Peer</a>
+                                  <div className="flex justify-between items-center mt-2">
+                                    <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Streaming Data</p>
+                                    <p className="text-[10px] font-black text-slate-400 tabular-nums">{file.progress}%</p>
+                                  </div>
                                 </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {history.length === 0 ? (
-                  <div className="bg-white rounded-3xl border border-slate-100 p-20 flex flex-col items-center justify-center text-center"><HistoryIcon /><p className="text-slate-400 font-medium mt-4">History empty.</p></div>
-                ) : (
-                  <div className="space-y-4">
-                    {history.map((item) => (
-                      <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm opacity-80 hover:opacity-100">
-                        <div className="flex items-start gap-4">
-                          <div className="p-3 rounded-2xl bg-slate-100 text-slate-500">{item.sender === 'Mac' ? <LaptopIcon /> : <SmartphoneIcon />}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <h3 className="text-sm font-bold text-slate-700 truncate">{item.name}</h3>
-                              <span className="text-[10px] font-bold text-slate-400">{formatSize(item.size)}</span>
+                              ) : file.status === TransferStatus.FAILED ? (
+                                <div className="mt-3 p-4 bg-red-50 border border-red-100 rounded-2xl text-[11px] text-red-600 font-bold uppercase tracking-widest">{file.errorMessage || "Tunnel Interrupted"}</div>
+                              ) : (
+                                <>
+                                  <div className="flex items-center gap-2.5 mt-2">
+                                    <CheckIcon /><span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Integrity Verified</span>
+                                  </div>
+                                  {file.aiInsight && (
+                                    <div className="mt-4 p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                                      <div className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[8px] font-black uppercase mt-0.5">AI</div>
+                                      <p className="text-[11px] text-slate-600 leading-relaxed font-medium italic">"{file.aiInsight}"</p>
+                                    </div>
+                                  )}
+                                  <div className="mt-5 flex gap-3">
+                                    <a href={file.url} download={file.name} className="flex-1 py-3.5 text-center bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-200 active:scale-95">Download File</a>
+                                  </div>
+                                </>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2 mt-1"><span className="text-[10px] font-bold text-slate-400 uppercase">{new Date(item.timestamp).toLocaleDateString()}</span></div>
+                          </div>
+                          <button onClick={() => setFiles(prev => prev.filter(f => f.id !== file.id))} className="absolute top-7 right-7 text-slate-200 hover:text-red-500 transition-colors"><TrashIcon /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  {history.length === 0 ? (
+                    <div className="bg-white rounded-[2.5rem] border border-slate-100 p-24 flex flex-col items-center justify-center text-center opacity-60">
+                      <div className="p-5 bg-slate-50 rounded-3xl mb-6"><HistoryIcon className="text-slate-300 w-8 h-8" /></div>
+                      <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">No previous session logs.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {history.map((item) => (
+                        <div key={item.id} className="bg-white p-7 rounded-[2.5rem] border border-slate-200 shadow-sm opacity-90 hover:opacity-100 transition-all hover:shadow-md">
+                          <div className="flex items-start gap-5">
+                            <div className="p-4 rounded-[1.5rem] bg-slate-50 text-slate-400 shadow-inner">
+                              {item.sender === 'Mac' ? <LaptopIcon className="w-6 h-6" /> : <SmartphoneIcon className="w-6 h-6" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-black text-slate-700 truncate tracking-tight">{item.name}</h3>
+                                <span className="text-[10px] font-black text-slate-400 tabular-nums">{formatSize(item.size)}</span>
+                              </div>
+                              
+                              {renderDirectionIndicator(item.sender)}
+
+                              <div className="flex items-center gap-3 mt-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(item.timestamp).toLocaleDateString()}</span>
+                                <div className="w-1 h-1 rounded-full bg-slate-200"></div>
+                                <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest">{item.type.split('/')[1] || 'BINARY'}</span>
+                              </div>
+                              {item.aiInsight && (
+                                <div className="mt-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex items-start gap-3">
+                                  <div className="px-1.5 py-0.5 bg-slate-400 text-white rounded text-[8px] font-black uppercase mt-0.5">LOG</div>
+                                  <p className="text-[11px] text-slate-500 leading-relaxed font-medium italic">"{item.aiInsight}"</p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             
-            <footer className="pt-10 pb-6 text-center">
-              <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest">
-                Support: <a href="mailto:ayushglobalenterprises@zohomail.in" className="text-blue-400 hover:text-blue-500 transition-colors">ayushglobalenterprises@zohomail.in</a>
-              </p>
+            <footer className="pt-16 pb-10 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Global Transmission Status: Active</p>
+                </div>
+                <p className="text-slate-300 text-[10px] font-bold uppercase tracking-widest leading-relaxed">
+                  Platform Operations Hub:<br/>
+                  <a href="mailto:ayushglobalenterprises@zohomail.in" className="text-purple-400 hover:text-purple-600 transition-colors font-black mt-1 inline-block">ayushglobalenterprises@zohomail.in</a>
+                </p>
+              </div>
             </footer>
           </div>
         </div>
       </main>
 
-      <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 lg:hidden w-11/12 max-w-sm">
-        <label className="flex items-center justify-center w-full px-6 py-4 bg-blue-600 text-white rounded-2xl shadow-2xl font-bold cursor-pointer hover:bg-blue-700 active:scale-95 transition-all">
-          <UploadIcon /><span className="ml-2">Direct P2P Upload</span>
+      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 lg:hidden w-[calc(100%-2rem)] max-w-sm z-30 group">
+        <label className="flex items-center justify-center px-8 py-5 bg-slate-900 text-white rounded-[2.2rem] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] font-black uppercase tracking-widest text-[12px] cursor-pointer hover:bg-black active:scale-95 transition-all relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-orange-500/20 opacity-0 group-active:opacity-100 transition-opacity"></div>
+          <UploadIcon className="w-5 h-5" /><span className="ml-3 relative z-10">Select Stream Source</span>
           <input type="file" multiple onChange={handleFileUpload} className="hidden" />
         </label>
       </div>

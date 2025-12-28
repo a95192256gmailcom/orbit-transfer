@@ -11,7 +11,7 @@ export const getFileInsight = async (fileName: string, fileType: string, fileSiz
       model: 'gemini-3-flash-preview',
       contents: `Provide a very short, professional 1-sentence description or categorization for this file: ${fileName} (${fileType}, ${Math.round(fileSize / 1024)}KB). If it's a known format, explain its common use.`,
       config: {
-        maxOutputTokens: 100,
+        // Removed maxOutputTokens to prevent potential generation blocking issues.
         temperature: 0.7,
       },
     });
