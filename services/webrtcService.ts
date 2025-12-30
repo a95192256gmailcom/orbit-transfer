@@ -1,31 +1,55 @@
 
-import { FileChunk } from '../types';
-
-const CHUNK_SIZE = 16384; // 16KB chunks for optimal RTC throughput
+const CHUNK_SIZE = 16384;
 
 export class WebRTCService {
   private peerConnection: RTCPeerConnection | null = null;
   private dataChannel: RTCDataChannel | null = null;
   private onMessageCallback: ((data: any) => void) | null = null;
+  private onStatusChangeCallback: ((connected: boolean, state?: string) => void) | null = null;
   private signalChannel: BroadcastChannel;
   private roomId: string;
+  private isHost: boolean;
+  
+  // Track active transfers to support pausing and resuming
+  private activeTransfers = new Map<string, { 
+    file: File, 
+    offset: number, 
+    onProgress: (progress: number) => void,
+    isPaused: boolean 
+  }>();
 
-  constructor(roomId: string) {
+  constructor(roomId: string, isHost: boolean) {
     this.roomId = roomId;
-    // Using BroadcastChannel to simulate signaling between tabs/devices for this demo
+    this.isHost = isHost;
     this.signalChannel = new BroadcastChannel(`orbit_signal_${roomId}`);
     this.signalChannel.onmessage = this.handleSignal.bind(this);
+    
+    this.initPeerConnection();
+    
+    if (this.isHost) {
+      this.setupDataChannel();
+    } else {
+      setTimeout(() => {
+        this.signalChannel.postMessage({ type: 'PRESENCE_ANNOUNCE' });
+      }, 1000);
+    }
   }
 
   private async handleSignal(event: MessageEvent) {
     const { type, data } = event.data;
+    if (!this.peerConnection) return;
 
     switch (type) {
+      case 'PRESENCE_ANNOUNCE':
+        if (this.isHost) {
+          this.createOffer();
+        }
+        break;
       case 'OFFER':
-        await this.handleOffer(data);
+        if (!this.isHost) await this.handleOffer(data);
         break;
       case 'ANSWER':
-        await this.handleAnswer(data);
+        if (this.isHost) await this.handleAnswer(data);
         break;
       case 'ICE_CANDIDATE':
         await this.handleIceCandidate(data);
@@ -35,12 +59,15 @@ export class WebRTCService {
 
   private initPeerConnection() {
     this.peerConnection = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+      ]
     });
 
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        // Convert to JSON to avoid DataCloneError
         this.signalChannel.postMessage({ type: 'ICE_CANDIDATE', data: event.candidate.toJSON() });
       }
     };
@@ -48,6 +75,21 @@ export class WebRTCService {
     this.peerConnection.ondatachannel = (event) => {
       this.setDataChannel(event.channel);
     };
+
+    this.peerConnection.onconnectionstatechange = () => {
+      const state = this.peerConnection?.connectionState;
+      if (state === 'connected') {
+        this.onStatusChangeCallback?.(true, state);
+      } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+        this.onStatusChangeCallback?.(false, state);
+      }
+    };
+  }
+
+  private setupDataChannel() {
+    if (!this.peerConnection) return;
+    const channel = this.peerConnection.createDataChannel('orbitTransfer', { ordered: true });
+    this.setDataChannel(channel);
   }
 
   private setDataChannel(channel: RTCDataChannel) {
@@ -55,40 +97,36 @@ export class WebRTCService {
     this.dataChannel.binaryType = 'arraybuffer';
     
     this.dataChannel.onmessage = (event) => {
-      if (this.onMessageCallback) {
-        this.onMessageCallback(event.data);
-      }
+      this.onMessageCallback?.(event.data);
     };
 
-    this.dataChannel.onopen = () => console.log('P2P Channel Open');
-    this.dataChannel.onclose = () => console.log('P2P Channel Closed');
+    this.dataChannel.onopen = () => {
+      this.onStatusChangeCallback?.(true, 'open');
+    };
+
+    this.dataChannel.onclose = () => {
+      this.onStatusChangeCallback?.(false, 'closed');
+    };
   }
 
-  async createOffer() {
-    this.initPeerConnection();
-    if (!this.peerConnection) return;
-
-    const channel = this.peerConnection.createDataChannel('fileTransfer');
-    this.setDataChannel(channel);
-
+  async createOffer(): Promise<string | null> {
+    if (!this.peerConnection || !this.isHost) return null;
     const offer = await this.peerConnection.createOffer();
     await this.peerConnection.setLocalDescription(offer);
-    // RTCSessionDescriptionInit is already serializable; removed .toJSON() which is not defined on the type
     this.signalChannel.postMessage({ type: 'OFFER', data: offer });
+    return JSON.stringify(offer);
   }
 
-  private async handleOffer(offer: RTCSessionDescriptionInit) {
-    this.initPeerConnection();
-    if (!this.peerConnection) return;
-
+  async handleOffer(offer: RTCSessionDescriptionInit): Promise<string | null> {
+    if (!this.peerConnection) return null;
     await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
-    // RTCSessionDescriptionInit is already serializable; removed .toJSON() which is not defined on the type
     this.signalChannel.postMessage({ type: 'ANSWER', data: answer });
+    return JSON.stringify(answer);
   }
 
-  private async handleAnswer(answer: RTCSessionDescriptionInit) {
+  async handleAnswer(answer: RTCSessionDescriptionInit) {
     if (!this.peerConnection) return;
     await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
   }
@@ -98,7 +136,27 @@ export class WebRTCService {
     try {
       await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (e) {
-      console.error('Error adding ICE candidate', e);
+      console.warn('ICE Candidate skipped');
+    }
+  }
+
+  async getManualToken(): Promise<string> {
+    if (!this.peerConnection?.localDescription) {
+      await this.createOffer();
+    }
+    return btoa(JSON.stringify(this.peerConnection?.localDescription));
+  }
+
+  async processManualToken(token: string) {
+    try {
+      const data = JSON.parse(atob(token));
+      if (data.type === 'offer') {
+        await this.handleOffer(data);
+      } else if (data.type === 'answer') {
+        await this.handleAnswer(data);
+      }
+    } catch (e) {
+      throw new Error("Invalid Handshake Token");
     }
   }
 
@@ -106,52 +164,97 @@ export class WebRTCService {
     this.onMessageCallback = callback;
   }
 
-  async sendFile(file: File, onProgress: (progress: number) => void) {
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
-      throw new Error('P2P Connection not ready');
+  setOnStatusChange(callback: (connected: boolean, state?: string) => void) {
+    this.onStatusChangeCallback = callback;
+  }
+
+  // New method to pause a file transfer
+  pauseTransfer(fileId: string) {
+    const transfer = this.activeTransfers.get(fileId);
+    if (transfer) {
+      transfer.isPaused = true;
+      if (this.dataChannel && this.dataChannel.readyState === 'open') {
+        this.dataChannel.send(JSON.stringify({ type: 'TRANSFER_CONTROL', id: fileId, action: 'PAUSE' }));
+      }
     }
+  }
 
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  // New method to resume a file transfer
+  resumeTransfer(fileId: string) {
+    const transfer = this.activeTransfers.get(fileId);
+    if (transfer && transfer.isPaused) {
+      transfer.isPaused = false;
+      if (this.dataChannel && this.dataChannel.readyState === 'open') {
+        this.dataChannel.send(JSON.stringify({ type: 'TRANSFER_CONTROL', id: fileId, action: 'RESUME' }));
+      }
+      this.processChunks(fileId);
+    }
+  }
+
+  private processChunks(fileId: string) {
+    const transfer = this.activeTransfers.get(fileId);
+    if (!transfer || transfer.isPaused || !this.dataChannel || this.dataChannel.readyState !== 'open') return;
+
+    const { file, onProgress } = transfer;
     const reader = new FileReader();
-    let offset = 0;
-
-    // Send metadata first
-    this.dataChannel.send(JSON.stringify({
-      type: 'METADATA',
-      name: file.name,
-      size: file.size,
-      mimeType: file.type
-    }));
 
     const readNext = () => {
-      const slice = file.slice(offset, offset + CHUNK_SIZE);
+      if (transfer.isPaused) return;
+      
+      const slice = file.slice(transfer.offset, transfer.offset + CHUNK_SIZE);
       reader.readAsArrayBuffer(slice);
     };
 
     reader.onload = (e) => {
       const buffer = e.target?.result as ArrayBuffer;
       if (this.dataChannel && buffer) {
-        // High-performance check for buffer congestion
-        if (this.dataChannel.bufferedAmount > this.dataChannel.bufferedAmountLowThreshold) {
+        if (this.dataChannel.bufferedAmount > 2 * 1024 * 1024) {
           this.dataChannel.onbufferedamountlow = () => {
             if (this.dataChannel) {
-                this.dataChannel.onbufferedamountlow = null;
-                this.dataChannel.send(buffer);
-                offset += buffer.byteLength;
-                onProgress(Math.min(100, (offset / file.size) * 100));
-                if (offset < file.size) readNext();
+              this.dataChannel.onbufferedamountlow = null;
+              this.sendChunk(fileId, buffer, readNext);
             }
           };
         } else {
-          this.dataChannel.send(buffer);
-          offset += buffer.byteLength;
-          onProgress(Math.min(100, (offset / file.size) * 100));
-          if (offset < file.size) readNext();
+          this.sendChunk(fileId, buffer, readNext);
         }
       }
     };
 
     readNext();
+  }
+
+  private sendChunk(fileId: string, buffer: ArrayBuffer, next: () => void) {
+    const transfer = this.activeTransfers.get(fileId);
+    if (!transfer || !this.dataChannel) return;
+
+    this.dataChannel.send(buffer);
+    transfer.offset += buffer.byteLength;
+    transfer.onProgress(Math.min(100, (transfer.offset / transfer.file.size) * 100));
+
+    if (transfer.offset < transfer.file.size) {
+      next();
+    } else {
+      this.activeTransfers.delete(fileId);
+    }
+  }
+
+  async sendFile(fileId: string, file: File, onProgress: (progress: number) => void) {
+    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      throw new Error('Connection disconnected.');
+    }
+
+    // Initialize metadata
+    this.dataChannel.send(JSON.stringify({
+      type: 'METADATA',
+      id: fileId,
+      name: file.name,
+      size: file.size,
+      mimeType: file.type
+    }));
+
+    this.activeTransfers.set(fileId, { file, offset: 0, onProgress, isPaused: false });
+    this.processChunks(fileId);
   }
 
   destroy() {

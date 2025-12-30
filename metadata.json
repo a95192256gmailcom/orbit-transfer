@@ -1,5 +1,7 @@
 {
   "name": "Orbit Transfer",
   "description": "Enterprise-grade secure file sharing. Optimized for ultra-large files (up to 500GB) between Mac and Android using high-speed peer-to-peer simulation and AI insights.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

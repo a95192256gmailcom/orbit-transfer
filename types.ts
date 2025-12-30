@@ -4,7 +4,8 @@ export enum TransferStatus {
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
   PENDING = 'PENDING',
-  CONNECTING = 'CONNECTING'
+  CONNECTING = 'CONNECTING',
+  PAUSED = 'PAUSED'
 }
 
 export interface SharedFile {
